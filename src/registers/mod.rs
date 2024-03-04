@@ -50,3 +50,13 @@ bitflags! {
         const _ = !0;
     }
 }
+
+bitflags! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct SerialControl: u8 {
+        const TransferEnable = 1 << 7;
+        const MasterClock = 1;
+
+        const _ = !0;
+    }
+}

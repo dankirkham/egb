@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 use std::fmt::Display;
 
 use crate::cpu::Cpu;
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 use crate::registers::CpuFlags;
 use crate::symbols::Symbols;
 
@@ -17,8 +17,9 @@ pub enum Command {
     RemoveBreakpoint(u16),
 }
 
-#[derive(PartialEq)]
+#[derive(Default, PartialEq)]
 enum State {
+    #[default]
     Continue,
     StepOut(usize),
     StepIn(usize),
@@ -62,6 +63,7 @@ impl Display for Call {
     }
 }
 
+#[derive(Default)]
 pub struct Debugger {
     state: State,
     breakpoints: HashSet<u16>,
@@ -74,13 +76,15 @@ pub struct Debugger {
 impl Debugger {
     pub fn new(symbols: Option<Symbols>) -> Self {
         Debugger {
-            state: State::Continue,
-            breakpoints: HashSet::new(),
-            commands: VecDeque::new(),
-            callstack: Vec::new(),
-            last_pc: None,
             symbols,
+            ..Default::default()
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.commands = Default::default();
+        self.callstack = Default::default();
+        self.last_pc = Default::default();
     }
 
     fn call(&mut self, cpu: &Cpu, addr: u16) {
@@ -120,7 +124,7 @@ impl Debugger {
         &self.callstack
     }
 
-    pub fn tick(&mut self, cpu: &Cpu, mem: &impl CpuMemory) -> bool {
+    pub fn tick(&mut self, cpu: &Cpu, mem: &impl ProgramMemory) -> bool {
         while let Some(command) = self.commands.pop_front() {
             match command {
                 Command::Continue => {

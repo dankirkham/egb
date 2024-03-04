@@ -27,11 +27,15 @@ macro_rules! i1 {
             None
         };
         let instr = Instruction::new($self.addr as u16, $str.to_owned(), symbol);
-        (instr, 1)
+        Some((instr, 1))
     }};
 }
 macro_rules! i2 {
     ($self:ident, $str:literal) => {{
+        if $self.bytes.len() < 2 {
+            return None;
+        }
+
         let symbol = if let Some(symbols) = $self.symbols {
             symbols.get_symbol($self.addr as u16)
         } else {
@@ -39,11 +43,15 @@ macro_rules! i2 {
         };
         let n = u8::from($self.bytes[1]);
         let instr = Instruction::new($self.addr as u16, format!($str, n), symbol);
-        (instr, 2)
+        Some((instr, 2))
     }};
 }
 macro_rules! i3 {
     ($self:ident, $str:literal) => {{
+        if $self.bytes.len() < 3 {
+            return None;
+        }
+
         let symbol = if let Some(symbols) = $self.symbols {
             symbols.get_symbol($self.addr as u16)
         } else {
@@ -53,7 +61,7 @@ macro_rules! i3 {
         addr_bytes.copy_from_slice(&$self.bytes[1..3]);
         let n = u16::from_le_bytes(addr_bytes);
         let instr = Instruction::new($self.addr as u16, format!($str, n), symbol);
-        (instr, 3)
+        Some((instr, 3))
     }};
 }
 
@@ -65,13 +73,13 @@ impl<'a> Iterator for Decoder<'a> {
             return None;
         }
 
-        let (instr, len) = match self.bytes[0] {
-            0x06 => i2!(self, "ld b,0x{:x}"),
-            0x0e => i2!(self, "ld c,0x{:x}"),
-            0x16 => i2!(self, "ld d,0x{:x}"),
-            0x1e => i2!(self, "ld e,0x{:x}"),
-            0x26 => i2!(self, "ld h,0x{:x}"),
-            0x2e => i2!(self, "ld l,0x{:x}"),
+        let result = match self.bytes[0] {
+            0x06 => i2!(self, "ld b,0x{:02x}"),
+            0x0e => i2!(self, "ld c,0x{:02x}"),
+            0x16 => i2!(self, "ld d,0x{:02x}"),
+            0x1e => i2!(self, "ld e,0x{:02x}"),
+            0x26 => i2!(self, "ld h,0x{:02x}"),
+            0x2e => i2!(self, "ld l,0x{:02x}"),
             0x7f => i1!(self, "ld a,a"),
             0x78 => i1!(self, "ld a,b"),
             0x79 => i1!(self, "ld a,c"),
@@ -128,11 +136,11 @@ impl<'a> Iterator for Decoder<'a> {
             0x73 => i1!(self, "ld (hl),e"),
             0x74 => i1!(self, "ld (hl),h"),
             0x75 => i1!(self, "ld (hl),l"),
-            0x36 => i2!(self, "ld (hl),0x{:x}"),
+            0x36 => i2!(self, "ld (hl),0x{:02x}"),
             0x0a => i1!(self, "ld a,(bc)"),
             0x1a => i1!(self, "ld a,(de)"),
-            0xfa => i3!(self, "ld a,(0x{:x})"),
-            0x3e => i2!(self, "ld a,0x{:x}"),
+            0xfa => i3!(self, "ld a,(0x{:04x})"),
+            0x3e => i2!(self, "ld a,0x{:02x}"),
             0x47 => i1!(self, "ld b,a"),
             0x4f => i1!(self, "ld c,a"),
             0x57 => i1!(self, "ld d,a"),
@@ -142,22 +150,22 @@ impl<'a> Iterator for Decoder<'a> {
             0x02 => i1!(self, "ld (bc),a"),
             0x12 => i1!(self, "ld (de),a"),
             0x77 => i1!(self, "ld (hl),a"),
-            0xea => i3!(self, "ld (0x{:x}),a"),
+            0xea => i3!(self, "ld (0x{:04x}),a"),
             0xf2 => i1!(self, "ld a,(0xff00 + c)"),
             0xe2 => i1!(self, "ld (0xff00 + c),a"),
             0x3a => i1!(self, "ld a,(hl-)"),
             0x32 => i1!(self, "ld (hl-),a"),
             0x2a => i1!(self, "ld a,(hl+)"),
             0x22 => i1!(self, "ld (hl+),a"),
-            0xe0 => i2!(self, "ld (0xff00 + 0x{:x}),a"),
-            0xf0 => i2!(self, "ld a,(0xff00 + 0x{:x})"),
-            0x01 => i3!(self, "ld BC,0x{:x}"),
-            0x11 => i3!(self, "ld DE,0x{:x}"),
-            0x21 => i3!(self, "ld HL,0x{:x}"),
-            0x31 => i3!(self, "ld SP,0x{:x}"),
+            0xe0 => i2!(self, "ld (0xff00 + 0x{:02x}),a"),
+            0xf0 => i2!(self, "ld a,(0xff00 + 0x{:02x})"),
+            0x01 => i3!(self, "ld BC,0x{:04x}"),
+            0x11 => i3!(self, "ld DE,0x{:04x}"),
+            0x21 => i3!(self, "ld HL,0x{:04x}"),
+            0x31 => i3!(self, "ld SP,0x{:04x}"),
             0xf9 => i1!(self, "ld SP,HL"),
-            0xf8 => i2!(self, "ld SP,SP + 0x{:x}"),
-            0x08 => i3!(self, "ld 0x{:x},SP"),
+            0xf8 => i2!(self, "ld SP,SP + 0x{:02x}"),
+            0x08 => i3!(self, "ld 0x{:04x},SP"),
             0xf5 => i1!(self, "push af"),
             0xc5 => i1!(self, "push bc"),
             0xd5 => i1!(self, "push de"),
@@ -174,7 +182,7 @@ impl<'a> Iterator for Decoder<'a> {
             0x84 => i1!(self, "add a,h"),
             0x85 => i1!(self, "add a,l"),
             0x86 => i1!(self, "add a,(hl)"),
-            0xc6 => i2!(self, "add a,0x{:x}"),
+            0xc6 => i2!(self, "add a,0x{:02x}"),
             0x8f => i1!(self, "adc a,a"),
             0x88 => i1!(self, "adc a,b"),
             0x89 => i1!(self, "adc a,c"),
@@ -183,7 +191,7 @@ impl<'a> Iterator for Decoder<'a> {
             0x8c => i1!(self, "adc a,h"),
             0x8d => i1!(self, "adc a,l"),
             0x8e => i1!(self, "adc a,(hl)"),
-            0xce => i2!(self, "adc a,0x{:x}"),
+            0xce => i2!(self, "adc a,0x{:02x}"),
             0x97 => i1!(self, "sub a,a"),
             0x90 => i1!(self, "sub a,b"),
             0x91 => i1!(self, "sub a,c"),
@@ -192,7 +200,7 @@ impl<'a> Iterator for Decoder<'a> {
             0x94 => i1!(self, "sub a,h"),
             0x95 => i1!(self, "sub a,l"),
             0x96 => i1!(self, "sub a,(hl)"),
-            0xd6 => i2!(self, "sub a,0x{:x}"),
+            0xd6 => i2!(self, "sub a,0x{:02x}"),
             0x9f => i1!(self, "sbc a,a"),
             0x98 => i1!(self, "sbc a,b"),
             0x99 => i1!(self, "sbc a,c"),
@@ -201,7 +209,7 @@ impl<'a> Iterator for Decoder<'a> {
             0x9c => i1!(self, "sbc a,h"),
             0x9d => i1!(self, "sbc a,l"),
             0x9e => i1!(self, "sbc a,(hl)"),
-            0xde => i2!(self, "sbc a,0x{:x}"),
+            0xde => i2!(self, "sbc a,0x{:02x}"),
             0xa7 => i1!(self, "and a,a"),
             0xa0 => i1!(self, "and a,b"),
             0xa1 => i1!(self, "and a,c"),
@@ -210,7 +218,7 @@ impl<'a> Iterator for Decoder<'a> {
             0xa4 => i1!(self, "and a,h"),
             0xa5 => i1!(self, "and a,l"),
             0xa6 => i1!(self, "and a,(hl)"),
-            0xe6 => i2!(self, "and a,0x{:x}"),
+            0xe6 => i2!(self, "and a,0x{:02x}"),
             0xb7 => i1!(self, "or a,a"),
             0xb0 => i1!(self, "or a,b"),
             0xb1 => i1!(self, "or a,c"),
@@ -219,7 +227,7 @@ impl<'a> Iterator for Decoder<'a> {
             0xb4 => i1!(self, "or a,h"),
             0xb5 => i1!(self, "or a,l"),
             0xb6 => i1!(self, "or a,(hl)"),
-            0xf6 => i2!(self, "or a,0x{:x}"),
+            0xf6 => i2!(self, "or a,0x{:02x}"),
             0xaf => i1!(self, "xor a,a"),
             0xa8 => i1!(self, "xor a,b"),
             0xa9 => i1!(self, "xor a,c"),
@@ -228,7 +236,7 @@ impl<'a> Iterator for Decoder<'a> {
             0xac => i1!(self, "xor a,h"),
             0xad => i1!(self, "xor a,l"),
             0xae => i1!(self, "xor a,(hl)"),
-            0xee => i2!(self, "xor a,0x{:x}"),
+            0xee => i2!(self, "xor a,0x{:02x}"),
             0xbf => i1!(self, "cp a,a"),
             0xb8 => i1!(self, "cp a,b"),
             0xb9 => i1!(self, "cp a,c"),
@@ -237,7 +245,7 @@ impl<'a> Iterator for Decoder<'a> {
             0xbc => i1!(self, "cp a,h"),
             0xbd => i1!(self, "cp a,l"),
             0xbe => i1!(self, "cp a,(hl)"),
-            0xfe => i2!(self, "cp a,0x{:x}"),
+            0xfe => i2!(self, "cp a,0x{:02x}"),
             0x3c => i1!(self, "inc a"),
             0x04 => i1!(self, "inc b"),
             0x0c => i1!(self, "inc c"),
@@ -258,7 +266,7 @@ impl<'a> Iterator for Decoder<'a> {
             0x19 => i1!(self, "add hl,de"),
             0x29 => i1!(self, "add hl,hl"),
             0x39 => i1!(self, "add hl,sp"),
-            0xe8 => i2!(self, "add sp,0x{:x}"),
+            0xe8 => i2!(self, "add sp,0x{:02x}"),
             0x03 => i1!(self, "inc bc"),
             0x13 => i1!(self, "inc de"),
             0x23 => i1!(self, "inc hl"),
@@ -280,22 +288,22 @@ impl<'a> Iterator for Decoder<'a> {
             0x17 => i1!(self, "rla"),
             0x0f => i1!(self, "rrca"),
             0x1f => i1!(self, "rra"),
-            0xc3 => i3!(self, "jp 0x{:x}"),
-            0xc2 => i3!(self, "jp NZ,0x{:x}"),
-            0xca => i3!(self, "jp Z,0x{:x}"),
-            0xd2 => i3!(self, "jp NC,0x{:x}"),
-            0xda => i3!(self, "jp C,0x{:x}"),
+            0xc3 => i3!(self, "jp 0x{:04x}"),
+            0xc2 => i3!(self, "jp NZ,0x{:04x}"),
+            0xca => i3!(self, "jp Z,0x{:04x}"),
+            0xd2 => i3!(self, "jp NC,0x{:04x}"),
+            0xda => i3!(self, "jp C,0x{:04x}"),
             0xe9 => i1!(self, "jp (hl)"),
-            0x18 => i2!(self, "jr 0x{:x}"),
-            0x20 => i2!(self, "jr NZ,0x{:x}"),
-            0x28 => i2!(self, "jr Z,0x{:x}"),
-            0x30 => i2!(self, "jr NC,0x{:x}"),
-            0x38 => i2!(self, "jr C,0x{:x}"),
-            0xcd => i3!(self, "call 0x{:x}"),
-            0xc4 => i3!(self, "call NZ,0x{:x}"),
-            0xcc => i3!(self, "call Z,0x{:x}"),
-            0xd4 => i3!(self, "call NC,0x{:x}"),
-            0xdc => i3!(self, "call C,0x{:x}"),
+            0x18 => i2!(self, "jr 0x{:02x}"),
+            0x20 => i2!(self, "jr NZ,0x{:02x}"),
+            0x28 => i2!(self, "jr Z,0x{:02x}"),
+            0x30 => i2!(self, "jr NC,0x{:02x}"),
+            0x38 => i2!(self, "jr C,0x{:02x}"),
+            0xcd => i3!(self, "call 0x{:04x}"),
+            0xc4 => i3!(self, "call NZ,0x{:04x}"),
+            0xcc => i3!(self, "call Z,0x{:04x}"),
+            0xd4 => i3!(self, "call NC,0x{:04x}"),
+            0xdc => i3!(self, "call C,0x{:04x}"),
             0xc7 => i1!(self, "rst 0x00"),
             0xcf => i1!(self, "rst 0x08"),
             0xd7 => i1!(self, "rst 0x10"),
@@ -313,7 +321,7 @@ impl<'a> Iterator for Decoder<'a> {
 
             0xcb => {
                 self.bytes.advance(1);
-                let (instr, len) = match self.bytes[0] {
+                let result = match self.bytes[0] {
                     0x37 => i1!(self, "swap a"),
                     0x30 => i1!(self, "swap b"),
                     0x31 => i1!(self, "swap c"),
@@ -572,11 +580,14 @@ impl<'a> Iterator for Decoder<'a> {
                     0xbe => i1!(self, "res 7,hl"),
                 };
 
-                let addr = self.addr;
-                self.addr += len + 1_u32;
-                self.bytes.advance(len as usize);
+                if let Some((instr, len)) = result {
+                    let addr = self.addr;
+                    self.addr += len + 1_u32;
+                    self.bytes.advance(len as usize);
 
-                return Some((addr as u16, instr));
+                    return Some((addr as u16, instr));
+                }
+                return None;
             }
 
             0xd3 => i1!(self, "undefined (0xd3)"),
@@ -592,10 +603,14 @@ impl<'a> Iterator for Decoder<'a> {
             0xfd => i1!(self, "undefined (0xfd)"),
         };
 
-        let addr = self.addr;
-        self.addr += len as u32;
-        self.bytes.advance(len as usize);
+        if let Some((instr, len)) = result {
+            let addr = self.addr;
+            self.addr += len as u32;
+            self.bytes.advance(len as usize);
 
-        Some((addr as u16, instr))
+            Some((addr as u16, instr))
+        } else {
+            None
+        }
     }
 }

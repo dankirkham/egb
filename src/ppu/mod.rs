@@ -1,17 +1,19 @@
 mod constants;
 mod gb_image;
 mod pixel;
+mod registers;
 
 use egui::ColorImage;
 
-use crate::memory::PpuMemory;
+use crate::memory::{Memory, UpperRam, VRam};
 use crate::memory_map::MemoryMap;
 use crate::registers::graphics::*;
 use crate::registers::Interrupt;
 
 use self::constants::*;
-use self::gb_image::GbImage;
+use self::gb_image::{Buffers, GbImage};
 use self::pixel::Pixel;
+use self::registers::Registers;
 
 struct Object {
     y: u8,
@@ -32,10 +34,9 @@ enum PpuMode {
 pub struct Ppu {
     mode: PpuMode,
     dot: u32,
-    background: GbImage,
-    screen: GbImage,
-    other_background: GbImage,
-    other_screen: GbImage,
+    background: Buffers,
+    screen: Buffers,
+    tiles: Buffers,
 }
 
 impl Default for Ppu {
@@ -43,43 +44,53 @@ impl Default for Ppu {
         Self {
             mode: PpuMode::default(),
             dot: 0,
-            background: GbImage::background(),
-            screen: GbImage::screen(),
-            other_background: GbImage::background(),
-            other_screen: GbImage::screen(),
+            background: Buffers::background(),
+            screen: Buffers::screen(),
+            tiles: Buffers::tiles(),
         }
     }
 }
 
-pub fn draw_tile(
-    mem: &impl PpuMemory,
-    image: &mut GbImage,
-    lcdc4: bool,
-    tile_idx: u32,
-    row: u32,
-    col: u32,
-) {
+pub fn draw_tile_for_tilemap(vram: &VRam, image: &mut GbImage, tile_idx: u32, row: u32, col: u32) {
     let tile_start = tile_idx * BYTES_PER_TILE;
     for tile_y in 0..TILE_SIZE {
         let line_start = (tile_start + (tile_y * BYTES_PER_TILE_LINE)) as u16;
-        let (low, high) = if lcdc4 {
+        let ptr = (0x8000_u16).wrapping_add(line_start);
+        let base: u16 = MemoryMap::VRam.into();
+        let ptr = ptr - base;
+        let low = vram[ptr as usize];
+        let high = vram[ptr as usize + 1];
+        let y = row * TILE_SIZE + tile_y;
+        for tile_x in 0..TILE_SIZE {
+            let dot: u8 = (((high >> tile_x) & 1) << 1) | ((low >> tile_x) & 1);
+            let x = col * TILE_SIZE + (TILE_SIZE - tile_x - 1);
+            image.put_pixel(x, y, dot.into());
+        }
+    }
+}
+
+pub fn draw_tile(vram: &VRam, image: &mut GbImage, lcdc4: bool, tile_idx: u32, row: u32, col: u32) {
+    let tile_start = tile_idx * BYTES_PER_TILE;
+    for tile_y in 0..TILE_SIZE {
+        let line_start = (tile_start + (tile_y * BYTES_PER_TILE_LINE)) as u16;
+        let ptr: u16 = if lcdc4 {
             let ptr = (0x8000_u16).wrapping_add(line_start);
-            let low = mem.get_u8(ptr);
-            let high = mem.get_u8(ptr + 1);
-            (low, high)
+            let base: u16 = MemoryMap::VRam.into();
+            ptr - base
         } else {
             let ptr = if line_start >= 0x800 {
                 0x8000_u16.wrapping_add(line_start)
             } else {
                 0x9000_u16.wrapping_add_signed(line_start as i16)
             };
-            let low = mem.get_u8(ptr);
-            let high = mem.get_u8(ptr + 1);
-            (low, high)
+            let base: u16 = MemoryMap::VRam.into();
+            ptr - base
         };
+        let low = vram[ptr as usize];
+        let high = vram[ptr as usize + 1];
         let y = row * TILE_SIZE + tile_y;
         for tile_x in 0..TILE_SIZE {
-            let dot = (((high >> tile_x) & 1) << 1) | ((low >> tile_x) & 1);
+            let dot: u8 = (((high >> tile_x) & 1) << 1) | ((low >> tile_x) & 1);
             let x = col * TILE_SIZE + (TILE_SIZE - tile_x - 1);
             image.put_pixel(x, y, dot.into());
         }
@@ -87,42 +98,48 @@ pub fn draw_tile(
 }
 
 impl Ppu {
-    fn draw_background(&mut self, mem: &mut impl PpuMemory) {
-        let lcdc = mem.get_reg::<LcdControl>(MemoryMap::LCDC);
-        let lcdc4 = lcdc.contains(LcdControl::BgWindowTileDataArea);
-        let map_addr = if lcdc.contains(LcdControl::BgTileMapArea) {
-            0x9c00
-        } else {
-            0x9800
-        };
-        for row in 0..BACKGROUND_ROWS {
-            for col in 0..BACKGROUND_COLS {
-                let map_idx = row * BACKGROUND_COLS + col;
-                let tile_idx = mem.get_u8(map_addr + map_idx as u16) as u32;
-                draw_tile(mem, &mut self.background, lcdc4, tile_idx, row, col);
+    fn draw_tiles(&mut self, vram: &VRam) {
+        for row in 0..(8 * 3) {
+            for col in 0..16 {
+                let tile_idx = row * 16 + col;
+                draw_tile_for_tilemap(vram, &mut self.tiles.draw, tile_idx, row, col);
             }
         }
     }
 
-    fn get_objects(&self, mem: &mut impl PpuMemory, ly: u8) -> Vec<Object> {
-        let lcdc = mem.get_reg::<LcdControl>(MemoryMap::LCDC);
+    fn draw_background(&mut self, vram: &VRam, regs: &Registers) {
+        let lcdc4 = regs.lcdc.contains(LcdControl::BgWindowTileDataArea);
+        let map_addr = if regs.lcdc.contains(LcdControl::BgTileMapArea) {
+            0x9c00 - MemoryMap::VRam as usize
+        } else {
+            0x9800 - MemoryMap::VRam as usize
+        };
+        for row in 0..BACKGROUND_ROWS {
+            for col in 0..BACKGROUND_COLS {
+                let map_idx = row * BACKGROUND_COLS + col;
+                let tile_idx = vram[map_addr + map_idx as usize] as u32;
+                draw_tile(vram, &mut self.background.draw, lcdc4, tile_idx, row, col);
+            }
+        }
+    }
+
+    fn get_objects(&self, ur: &UpperRam, regs: &Registers) -> Vec<Object> {
         let mut objects = Vec::with_capacity(10);
 
-        let base_address = 0xfe00;
         for i in 0..40 {
-            let y = mem.get_u8(base_address + i * BYTES_PER_OAM);
+            let y = ur[i * BYTES_PER_OAM];
             if y == 0 {
                 continue;
             }
 
-            let height = lcdc.object_height();
-            if y - height <= ly || y - 16 > ly {
+            let height = regs.lcdc.object_height();
+            if y - height <= regs.ly || y - 16 > regs.ly {
                 continue;
             }
 
-            let x = mem.get_u8(base_address + i * BYTES_PER_OAM + 1);
-            let tile = mem.get_u8(base_address + i * BYTES_PER_OAM + 2);
-            let attributes = mem.get_u8(base_address + i * BYTES_PER_OAM + 3);
+            let x = ur[i * BYTES_PER_OAM + 1];
+            let tile = ur[i * BYTES_PER_OAM + 2];
+            let attributes = ur[i * BYTES_PER_OAM + 3];
             let attributes = ObjectAttributes::from_bits_retain(attributes);
 
             let object = Object {
@@ -143,21 +160,18 @@ impl Ppu {
         objects
     }
 
-    fn draw_object(&mut self, mem: &mut impl PpuMemory, ly: u8, object: Object) {
+    fn draw_object(&mut self, vram: &VRam, regs: &Registers, object: Object) {
         let tile_start = object.tile as u32 * BYTES_PER_TILE;
-        let lcdc = mem.get_reg::<LcdControl>(MemoryMap::LCDC);
-        let height = lcdc.object_height();
-        assert_eq!(height, 8);
+        assert_eq!(regs.lcdc.object_height(), 8);
         let tile_y = if object.attributes.contains(ObjectAttributes::YFlip) {
-            height - (ly + 16 - object.y) - 1
+            regs.lcdc.object_height() - (regs.ly + 16 - object.y) - 1
         } else {
-            ly + 16 - object.y
+            regs.ly + 16 - object.y
         };
         assert!((tile_y as u32) < TILE_SIZE);
-        let line_start = (tile_start + (tile_y as u32 * BYTES_PER_TILE_LINE)) as u16;
-        let ptr = 0x8000 + line_start;
-        let low = mem.get_u8(ptr);
-        let high = mem.get_u8(ptr + 1);
+        let ptr = (tile_start + (tile_y as u32 * BYTES_PER_TILE_LINE)) as usize;
+        let low = vram[ptr];
+        let high = vram[ptr + 1];
         let priority = !object.attributes.contains(ObjectAttributes::Priority);
         if !object.attributes.contains(ObjectAttributes::XFlip) {
             for tile_x in 0..TILE_SIZE {
@@ -167,7 +181,7 @@ impl Ppu {
                     continue;
                 }
                 let x = object.x as u32 + (TILE_SIZE - tile_x);
-                self.screen.put_pixel(x - 8, ly as u32, dot);
+                self.screen.draw.put_pixel(x - 8, regs.ly as u32, dot);
             }
         } else {
             for tile_x in 0..TILE_SIZE {
@@ -177,88 +191,98 @@ impl Ppu {
                     continue;
                 }
                 let x = object.x as u32 + tile_x;
-                self.screen.put_pixel(x - 8, ly as u32 - 16, dot);
+                self.screen.draw.put_pixel(x - 8, regs.ly as u32 - 16, dot);
             }
         }
     }
 
-    fn draw_line(&mut self, mem: &mut impl PpuMemory) {
-        let scy = mem.get_u8(MemoryMap::SCY) as u32;
-        let scx = mem.get_u8(MemoryMap::SCX) as u32;
-        let y = mem.get_u8(MemoryMap::LY) as u32;
-
+    fn draw_line(&mut self, vram: &VRam, ur: &UpperRam, regs: &Registers) {
         for x in 0..(LCD_WIDTH as u32) {
-            let pixel = self
-                .background
-                .get_pixel_wrapping(x.wrapping_add(scx), y.wrapping_add(scy));
-            self.screen.put_pixel(x, y, pixel);
+            let pixel = self.background.view.get_pixel_wrapping(
+                x.wrapping_add(regs.scx as u32),
+                (regs.ly as u32).wrapping_add(regs.scy as u32),
+            );
+            self.screen.draw.put_pixel(x, regs.ly as u32, pixel);
         }
 
-        let lcdc = mem.get_reg::<LcdControl>(MemoryMap::LCDC);
-        if lcdc.contains(LcdControl::ObjEnable) {
-            let objects = self.get_objects(mem, y as u8);
+        if regs.lcdc.contains(LcdControl::ObjEnable) {
+            let objects = self.get_objects(ur, regs);
             for object in objects {
-                self.draw_object(mem, y as u8, object);
+                self.draw_object(vram, regs, object);
             }
         }
     }
 
     pub fn get_background(&self) -> ColorImage {
-        (&self.other_background).into()
+        (&self.background.view).into()
     }
 
     pub fn get_screen(&self) -> ColorImage {
-        (&self.other_screen).into()
+        (&self.screen.view).into()
     }
 
-    pub fn tick(&mut self, mem: &mut impl PpuMemory) {
-        let lcdc = mem.get_reg::<LcdControl>(MemoryMap::LCDC);
+    pub fn get_tiles(&self) -> ColorImage {
+        (&self.tiles.view).into()
+    }
 
-        if !lcdc.contains(LcdControl::LcdPpuEnable) {
+    pub fn tick(&mut self, mem: &mut Memory) {
+        let mut regs = Registers::read(mem);
+
+        for _ in 0..4 {
+            self.t_cycle(mem, &mut regs);
+        }
+
+        regs.write(mem);
+    }
+
+    fn t_cycle(&mut self, mem: &mut Memory, regs: &mut Registers) {
+        let vram = mem.get_vram();
+        if !regs.lcdc.contains(LcdControl::LcdPpuEnable) {
             // PPU is disabled. Reset.
             self.dot = 0;
             self.mode = PpuMode::Mode2;
-            mem.set_u8(MemoryMap::LY, 0);
+
+            regs.ly = 0;
             return;
         }
 
         self.dot += 1;
 
-        let mut stat = mem.get_reg::<LcdStatus>(MemoryMap::STAT);
-
         match self.mode {
             PpuMode::Mode0 => {
                 if self.dot > MODE_0_DOTS {
-                    mem.inc_u8(MemoryMap::LY);
+                    regs.ly += 1;
                     self.dot = 0;
 
-                    if mem.get_u8(MemoryMap::LY) >= LCD_HEIGHT {
+                    if regs.ly >= LCD_HEIGHT {
                         self.mode = PpuMode::Mode1;
-                        mem.set_reg_flag(MemoryMap::IF, Interrupt::VBlank);
-                        if stat.contains(LcdStatus::Mode1Interrupt) {
-                            mem.set_reg_flag(MemoryMap::IF, Interrupt::LcdStat);
+                        regs.if_reg.set(Interrupt::VBlank, true);
+                        if regs.stat.contains(LcdStatus::Mode1Interrupt) {
+                            regs.if_reg.set(Interrupt::LcdStat, true);
                         }
                     } else {
                         self.mode = PpuMode::Mode2;
-                        if stat.contains(LcdStatus::Mode2Interrupt) {
-                            mem.set_reg_flag(MemoryMap::IF, Interrupt::LcdStat);
+                        if regs.stat.contains(LcdStatus::Mode2Interrupt) {
+                            regs.if_reg.set(Interrupt::LcdStat, true);
                         }
                     }
                 }
             }
             PpuMode::Mode1 => {
                 if self.dot > MODE_1_DOTS_PER_LINE {
-                    mem.inc_u8(MemoryMap::LY);
+                    regs.ly += 1;
                     self.dot = 0;
 
-                    if mem.get_u8(MemoryMap::LY) > SCAN_LINES {
-                        self.draw_background(mem);
-                        std::mem::swap(&mut self.background, &mut self.other_background);
-                        std::mem::swap(&mut self.screen, &mut self.other_screen);
+                    if regs.ly > SCAN_LINES {
+                        self.draw_tiles(vram);
+                        self.draw_background(vram, &regs);
+                        self.tiles.swap();
+                        self.background.swap();
+                        self.screen.swap();
                         self.mode = PpuMode::Mode2;
-                        mem.set_u8(MemoryMap::LY, 0);
-                        if stat.contains(LcdStatus::Mode2Interrupt) {
-                            mem.set_reg_flag(MemoryMap::IF, Interrupt::LcdStat);
+                        regs.ly = 0;
+                        if regs.stat.contains(LcdStatus::Mode2Interrupt) {
+                            regs.if_reg.set(Interrupt::LcdStat, true);
                         }
                     }
                 }
@@ -271,22 +295,19 @@ impl Ppu {
             }
             PpuMode::Mode3 => {
                 if self.dot > MODE_3_DOTS {
-                    self.draw_line(mem);
+                    self.draw_line(vram, mem.get_upper_ram(), &regs);
                     self.dot = 0;
                     self.mode = PpuMode::Mode0;
-                    if stat.contains(LcdStatus::Mode1Interrupt) {
-                        mem.set_reg_flag(MemoryMap::IF, Interrupt::LcdStat);
+                    if regs.stat.contains(LcdStatus::Mode1Interrupt) {
+                        regs.if_reg.set(Interrupt::LcdStat, true);
                     }
                 }
             }
         }
 
-        let lyc_eq_ly = mem.get_u8(MemoryMap::LY) == mem.get_u8(MemoryMap::LYC);
-        if lyc_eq_ly && stat.contains(LcdStatus::LycInterrupt) {
-            mem.set_reg_flag(MemoryMap::IF, Interrupt::LcdStat);
+        if regs.ly == regs.lyc && regs.stat.contains(LcdStatus::LycInterrupt) {
+            regs.if_reg.set(Interrupt::LcdStat, true);
         }
-        stat.set(LcdStatus::LycEqLy, lyc_eq_ly);
-        // TODO: Set PPU mode
-        mem.set_reg(MemoryMap::STAT, stat);
+        regs.stat.set(LcdStatus::LycEqLy, regs.ly == regs.lyc);
     }
 }

@@ -19,9 +19,9 @@ use rot_shift::*;
 use undef::*;
 
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 
-pub fn execute_instr(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn execute_instr(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     match mem.get_u8(cpu.pc) {
         0x00 => op00(cpu, mem),
         0x01 => op01(cpu, mem),

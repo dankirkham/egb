@@ -8,6 +8,7 @@ pub enum MemoryMap {
     HeaderCartridgeType = 0x0147,
     HeaderRomSize = 0x0148,
     HeaderRamSize = 0x0149,
+    VRam = 0x8000,
     Joypad = 0xff00,
     SB = 0xff01,
     SC = 0xff02,

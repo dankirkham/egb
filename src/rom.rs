@@ -26,4 +26,3 @@ impl FromStr for Rom {
         }
     }
 }
-

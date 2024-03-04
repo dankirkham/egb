@@ -1,10 +1,10 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 use crate::registers::CpuFlags;
 
 macro_rules! add16 {
     ( $name:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &mut impl ProgramMemory) -> Cycles {
             let l = cpu.get_hl() as u32;
             let r = cpu.$src() as u32;
             let result = l + r;
@@ -23,7 +23,7 @@ add16!(op19, get_de);
 add16!(op29, get_hl);
 add16!(op39, get_sp);
 
-pub fn ope8(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn ope8(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let l = cpu.get_sp();
     let r_u8 = mem.get_u8(cpu.pc.wrapping_add(1));
     let r: i16 = (r_u8 as i8).into();
@@ -50,7 +50,7 @@ pub fn ope8(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
 
 macro_rules! inc16 {
     ( $name:ident, $dst:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let val = cpu.$src().wrapping_add(1);
             cpu.$dst(val);
             cpu.pc += 1;
@@ -65,7 +65,7 @@ inc16!(op33, set_sp, get_sp);
 
 macro_rules! dec16 {
     ( $name:ident, $dst:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let val = cpu.$src().wrapping_sub(1);
             cpu.$dst(val);
             cpu.pc += 1;

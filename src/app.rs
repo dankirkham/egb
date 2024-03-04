@@ -4,7 +4,8 @@ use egui::*;
 use egui_notify::{Anchor, Toasts};
 
 use crate::dasm::Disassembly;
-use crate::gameboy::{Gameboy, CLOCK_SPEED_HZ};
+use crate::gameboy::Gameboy;
+use crate::governor::Governor;
 use crate::loader::Loader;
 use crate::symbols::Symbols;
 use crate::time::Instant;
@@ -21,15 +22,11 @@ pub struct App<'a> {
     memory_viewer_state: MemoryViewerState,
     disasm_panel_state: DisasmPanelState,
     console: String,
-    speed: Average,
-    last_time: Option<Instant>,
-    tile_data_image: Option<Image<'a>>,
-    tile_data_texture: Option<TextureHandle>,
-    background_image: Option<Image<'a>>,
-    background_texture: Option<TextureHandle>,
-    screen_image: Option<Image<'a>>,
-    screen_texture: Option<TextureHandle>,
+    screen: ViewerContext<'a>,
+    viewer_select_state: ViewerSelectState<'a>,
     developer_mode: bool,
+    governor: Governor,
+    last_toast: Instant,
 }
 
 impl<'a> App<'a> {
@@ -39,48 +36,36 @@ impl<'a> App<'a> {
             loader,
             disassembly: None,
             bp_string: "c000".to_owned(),
-            toasts: Toasts::default().with_anchor(Anchor::BottomRight),
+            toasts: Toasts::default().with_anchor(Anchor::TopRight),
             memory_viewer_state: MemoryViewerState::default(),
             disasm_panel_state: DisasmPanelState::new(symbols),
             console: String::default(),
-            speed: Average::default(),
-            last_time: None,
-            tile_data_image: None,
-            tile_data_texture: None,
-            background_image: None,
-            background_texture: None,
-            screen_image: None,
-            screen_texture: None,
-            developer_mode: true,
+            screen: ViewerContext::default(),
+            viewer_select_state: ViewerSelectState::default(),
+            developer_mode: false,
+            governor: Governor::default(),
+            last_toast: Instant::now(),
         }
     }
 }
 
 impl eframe::App for App<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if let Some(last) = self.last_time {
-            let now = Instant::now();
-            let duration = now.duration_since(last);
-            let target_duration = Duration::from_secs_f64(1. / REFRESH_HZ as f64);
-            let speed = target_duration.as_secs_f64() / duration.as_secs_f64();
-            self.speed.update(speed);
-            self.last_time = Some(now);
-        } else {
-            self.last_time = Some(Instant::now());
-        }
+        let frame_start = Instant::now();
 
-        for _ in 0..(CLOCK_SPEED_HZ / REFRESH_HZ) {
-            if let Some(c) = self.gameboy.tick() {
-                self.console.push(c as char);
-            }
-        }
+        self.governor.tick(&mut self.gameboy, &mut self.console);
 
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-            Toolbar::new(&mut self.gameboy, &mut self.loader, &mut self.developer_mode).ui(ui);
+            Toolbar::new(
+                &mut self.gameboy,
+                &mut self.loader,
+                &mut self.developer_mode,
+            )
+            .ui(ui);
         });
 
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
-            Status::new(self.speed.get_average()).ui(ui);
+            Status::new(&mut self.toasts, &mut self.governor).ui(ui);
         });
 
         if self.developer_mode {
@@ -134,29 +119,15 @@ impl eframe::App for App<'_> {
                 egui::SidePanel::right("tile_panel")
                     .min_width(250.)
                     .show(ctx, |ui| {
-                        TileData::new(
-                            &self.gameboy.mem,
-                            &mut self.tile_data_image,
-                            &mut self.tile_data_texture,
-                        )
-                        .ui(ui);
-                        ui.separator();
-                        Background::new(
-                            &self.gameboy.ppu,
-                            &mut self.background_image,
-                            &mut self.background_texture,
-                        )
-                        .ui(ui);
+                        ViewerSelect::new(
+                            &mut self.gameboy.ppu,
+                            &mut self.viewer_select_state,
+                        ).ui(ui);
                     });
             }
 
             egui::CentralPanel::default().show(ctx, |ui| {
-                Screen::new(
-                    &self.gameboy.ppu,
-                    &mut self.screen_image,
-                    &mut self.screen_texture,
-                )
-                .ui(ui);
+                Viewer::new(&mut self.screen).ui(ui, "screen", self.gameboy.ppu.get_screen());
             });
         });
 
@@ -174,11 +145,20 @@ impl eframe::App for App<'_> {
             buttons.right = !(i.key_down(Key::ArrowRight) || i.key_down(Key::D));
         });
 
-        let render_time = self.last_time.unwrap().elapsed();
+        let render_time = frame_start.elapsed();
         let frame_time = std::time::Duration::from_millis(1000 / REFRESH_HZ);
         match frame_time.checked_sub(render_time) {
             Some(delta) => ctx.request_repaint_after(delta),
-            None => ctx.request_repaint(),
+            None => {
+                if self.last_toast.elapsed().as_secs() >= 10 {
+                    self.toasts
+                        .warning(format!("Emulator is falling behind"))
+                        .set_duration(Some(Duration::from_secs(5)));
+                    self.last_toast = Instant::now();
+                }
+                self.governor.skip();
+                ctx.request_repaint()
+            }
         }
     }
 }

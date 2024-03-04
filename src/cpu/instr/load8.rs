@@ -1,9 +1,9 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 
 macro_rules! l8_imm {
     ( $name:ident, $dst:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst = mem.get_u8(cpu.pc.wrapping_add(1));
             cpu.pc += 2;
             Cycles(8)
@@ -19,7 +19,7 @@ l8_imm!(op2e, l);
 
 macro_rules! l8_reg {
     ( $name:ident, $dst:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst = cpu.$src;
             cpu.pc += 1;
             Cycles(4)
@@ -78,7 +78,7 @@ l8_reg!(op6f, l, a);
 
 macro_rules! l8_from_mem {
     ( $name:ident, $dst:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst = mem.get_u8(cpu.$src());
             cpu.pc += 1;
             Cycles(8)
@@ -95,7 +95,7 @@ l8_from_mem!(op6e, l, get_hl);
 
 macro_rules! l8_to_mem {
     ( $name:ident, $src:ident, $dst:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             mem.set_u8(cpu.$dst(), cpu.$src);
             cpu.pc += 1;
             Cycles(8)
@@ -109,7 +109,7 @@ l8_to_mem!(op73, e, get_hl);
 l8_to_mem!(op74, h, get_hl);
 l8_to_mem!(op75, l, get_hl);
 
-pub fn op36(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn op36(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     mem.set_u8(cpu.get_hl(), mem.get_u8(cpu.pc.wrapping_add(1)));
     cpu.pc += 2;
     Cycles(12)
@@ -117,7 +117,7 @@ pub fn op36(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
 
 l8_from_mem!(op0a, a, get_bc);
 l8_from_mem!(op1a, a, get_de);
-pub fn opfa(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opfa(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let low = mem.get_u8(cpu.pc.wrapping_add(1));
     let high = mem.get_u8(cpu.pc.wrapping_add(2));
     let addr = (high as u16) << 8 | low as u16;
@@ -125,7 +125,7 @@ pub fn opfa(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
     cpu.pc += 3;
     Cycles(16)
 }
-pub fn op3e(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn op3e(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     cpu.a = mem.get_u8(cpu.pc.wrapping_add(1));
     cpu.pc += 2;
     Cycles(8)
@@ -134,7 +134,7 @@ pub fn op3e(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
 l8_to_mem!(op02, a, get_bc);
 l8_to_mem!(op12, a, get_de);
 l8_to_mem!(op77, a, get_hl);
-pub fn opea(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn opea(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let low = mem.get_u8(cpu.pc.wrapping_add(1));
     let high = mem.get_u8(cpu.pc.wrapping_add(2));
     let addr = (high as u16) << 8 | low as u16;
@@ -143,7 +143,7 @@ pub fn opea(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
     Cycles(16)
 }
 
-pub fn opf2(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opf2(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let low = cpu.c;
     let high = 0xff;
     let addr = (high as u16) << 8 | low as u16;
@@ -152,7 +152,7 @@ pub fn opf2(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn ope2(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn ope2(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let low = cpu.c;
     let high = 0xff;
     let addr = (high as u16) << 8 | low as u16;
@@ -161,7 +161,7 @@ pub fn ope2(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn op3a(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn op3a(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let hl = cpu.get_hl();
     cpu.a = mem.get_u8(hl);
     cpu.set_hl(hl - 1);
@@ -169,7 +169,7 @@ pub fn op3a(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn op32(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn op32(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let hl = cpu.get_hl();
     mem.set_u8(hl, cpu.a);
     cpu.set_hl(hl - 1);
@@ -177,7 +177,7 @@ pub fn op32(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn op2a(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn op2a(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let hl = cpu.get_hl();
     cpu.a = mem.get_u8(hl);
     cpu.set_hl(hl.wrapping_add(1));
@@ -185,7 +185,7 @@ pub fn op2a(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn op22(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn op22(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let hl = cpu.get_hl();
     mem.set_u8(hl, cpu.a);
     cpu.set_hl(hl.wrapping_add(1));
@@ -193,7 +193,7 @@ pub fn op22(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
     Cycles(8)
 }
 
-pub fn ope0(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn ope0(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let low = mem.get_u8(cpu.pc.wrapping_add(1));
     let high = 0xff;
     let addr = (high as u16) << 8 | low as u16;
@@ -202,7 +202,7 @@ pub fn ope0(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
     Cycles(12)
 }
 
-pub fn opf0(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opf0(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let low = mem.get_u8(cpu.pc.wrapping_add(1));
     let high = 0xff;
     let addr = (high as u16) << 8 | low as u16;

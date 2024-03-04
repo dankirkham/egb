@@ -1,9 +1,9 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 
 macro_rules! undef {
     ( $name:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             println!("{}", cpu);
             panic!("Undefined instruction used!");
         }

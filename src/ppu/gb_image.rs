@@ -4,7 +4,37 @@ use image::{DynamicImage, EncodableLayout, RgbImage};
 use crate::ppu::constants;
 use crate::ppu::pixel::Pixel;
 
-use super::{LCD_HEIGHT, LCD_WIDTH};
+pub struct Buffers {
+    pub draw: GbImage,
+    pub view: GbImage,
+}
+
+impl Buffers {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            draw: GbImage::new(width, height),
+            view: GbImage::new(width, height),
+        }
+    }
+
+    pub fn background() -> Self {
+        let width = constants::BACKGROUND_COLS * constants::TILE_SIZE;
+        let height = constants::BACKGROUND_ROWS * constants::TILE_SIZE;
+        Self::new(width, height)
+    }
+
+    pub fn screen() -> Self {
+        Self::new(constants::LCD_WIDTH as u32, constants::LCD_HEIGHT as u32)
+    }
+
+    pub fn tiles() -> Self {
+        Self::new(16 * constants::TILE_SIZE, 8 * 3 * constants::TILE_SIZE)
+    }
+
+    pub fn swap(&mut self) {
+        std::mem::swap(&mut self.draw, &mut self.view);
+    }
+}
 
 pub struct GbImage {
     width: u32,
@@ -21,16 +51,6 @@ impl GbImage {
             height,
             pixels,
         }
-    }
-
-    pub fn background() -> Self {
-        let width = constants::BACKGROUND_COLS * constants::TILE_SIZE;
-        let height = constants::BACKGROUND_ROWS * constants::TILE_SIZE;
-        Self::new(width, height)
-    }
-
-    pub fn screen() -> Self {
-        Self::new(LCD_WIDTH as u32, LCD_HEIGHT as u32)
     }
 
     pub fn put_pixel(&mut self, x: u32, y: u32, pixel: Pixel) {

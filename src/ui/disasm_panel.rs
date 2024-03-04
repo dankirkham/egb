@@ -61,7 +61,7 @@ impl<'a> DisasmPanel<'a> {
         ui.horizontal(|ui| {
             ui.label(title(ui, "disassembly"));
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                if ui.button(monospace("↻")).clicked() {
+                if ui.button(monospace("🔃")).clicked() {
                     let mut disassembly = None;
                     mem::swap(self.disassembly, &mut disassembly);
                 }
@@ -88,32 +88,32 @@ impl<'a> DisasmPanel<'a> {
             DisasmPanelSetting::Manual => self.state.address,
         };
 
-        let disassembly = if let Some(ref disassembly) = self.disassembly {
-            disassembly
-        } else {
+        if self.disassembly.is_none() {
             let mut disassembly = Some(Disassembly::from_bytes(
                 self.mem.into(),
                 self.state.symbols.as_ref(),
             ));
             mem::swap(self.disassembly, &mut disassembly);
-            self.disassembly.as_ref().unwrap()
-        };
-        if let Some(instructions) = disassembly.get_instructions_near(addr, -5..10) {
-            let count = instructions.len();
-            assert!(count >= 10);
-            for instr in instructions.into_iter() {
-                let mut rt = monospace(format!("{}", instr));
-                if instr.addr == self.pc {
-                    rt = rt.color(highlight(ui));
+        }
+
+        if let Some(ref disassembly) = self.disassembly {
+            if let Some(instructions) = disassembly.get_instructions_near(addr, -5..10) {
+                let count = instructions.len();
+                assert!(count >= 10);
+                for instr in instructions.into_iter() {
+                    let mut rt = monospace(format!("{}", instr));
+                    if instr.addr == addr {
+                        rt = rt.color(highlight(ui));
+                    }
+                    ui.label(rt);
                 }
-                ui.label(rt);
-            }
-            for _ in 0..(15 - count) {
-                ui.label("");
-            }
-        } else {
-            for _ in 0..15 {
-                ui.label("");
+                for _ in 0..(15 - count) {
+                    ui.label("");
+                }
+            } else {
+                for _ in 0..15 {
+                    ui.label("");
+                }
             }
         }
     }

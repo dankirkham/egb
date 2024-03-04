@@ -1,10 +1,10 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 use crate::registers::CpuFlags;
 
 macro_rules! bit {
     ( $name:ident, hl, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let reg = mem.get_u8(cpu.get_hl()) & 1 << $bit;
             cpu.f.set(CpuFlags::Z, reg == 0);
             cpu.f.set(CpuFlags::N, false);
@@ -14,7 +14,7 @@ macro_rules! bit {
         }
     };
     ( $name:ident, $dst:ident, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let reg = cpu.$dst & 1 << $bit;
             cpu.f.set(CpuFlags::Z, reg == 0);
             cpu.f.set(CpuFlags::N, false);
@@ -91,14 +91,14 @@ bit!(opcb7e, hl, 7);
 
 macro_rules! set {
     ( $name:ident, hl, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             mem.set_u8(cpu.get_hl(), mem.get_u8(cpu.get_hl()) | 1 << $bit);
             cpu.pc += 2;
             Cycles(16)
         }
     };
     ( $name:ident, $dst:ident, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst |= 1 << $bit;
             cpu.pc += 2;
             Cycles(8)
@@ -172,7 +172,7 @@ set!(opcbfe, hl, 7);
 
 macro_rules! res {
     ( $name:ident, hl, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let mut reg = mem.get_u8(cpu.get_hl());
             reg &= !(1 << $bit);
             mem.set_u8(cpu.get_hl(), reg);
@@ -181,7 +181,7 @@ macro_rules! res {
         }
     };
     ( $name:ident, $dst:ident, $bit:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst &= !(1 << $bit);
             cpu.pc += 2;
             Cycles(8)

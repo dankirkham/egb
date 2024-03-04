@@ -2,7 +2,7 @@ use egui::*;
 use egui_notify::Toasts;
 
 use crate::cpu::Cpu;
-use crate::memory::{CpuMemory, Memory};
+use crate::memory::{Memory, ProgramMemory};
 use crate::ui::*;
 
 #[derive(Default, PartialEq)]
@@ -45,16 +45,16 @@ impl<'a> MemoryViewer<'a> {
         }
     }
 
-    fn memory_cell(&self, cell_addr: u16, addr: u16, ui: &mut Ui) {
-        let mut text = monospace(format!("{:02x}", self.mem.get_u8(cell_addr)));
+    fn memory_cell(&self, mem: &impl ProgramMemory, cell_addr: u16, addr: u16, ui: &mut Ui) {
+        let mut text = monospace(format!("{:02x}", mem.get_u8(cell_addr)));
         if cell_addr == addr {
             text = text.color(highlight(ui));
         }
         ui.label(text);
     }
 
-    fn memory_cell_ascii(&self, cell_addr: u16, addr: u16, ui: &mut Ui) {
-        let c = self.mem.get_u8(cell_addr) as char;
+    fn memory_cell_ascii(&self, mem: &impl ProgramMemory, cell_addr: u16, addr: u16, ui: &mut Ui) {
+        let c = mem.get_u8(cell_addr) as char;
         let c = if c.is_ascii_graphic() { c } else { '.' };
         let mut text = monospace(format!("{}", c));
         if cell_addr == addr {
@@ -68,13 +68,13 @@ impl<'a> MemoryViewer<'a> {
             ui.label(monospace(format!("0x{:04x}: ", row_addr)));
 
             for i in 0..8 {
-                self.memory_cell(row_addr + i * 2, addr, ui);
-                self.memory_cell(row_addr + i * 2 + 1, addr, ui);
+                self.memory_cell(self.mem, row_addr + i * 2, addr, ui);
+                self.memory_cell(self.mem, row_addr + i * 2 + 1, addr, ui);
                 ui.label(monospace(" "));
             }
 
             for i in 0..16 {
-                self.memory_cell_ascii(row_addr + i, addr, ui);
+                self.memory_cell_ascii(self.mem, row_addr + i, addr, ui);
             }
         });
     }

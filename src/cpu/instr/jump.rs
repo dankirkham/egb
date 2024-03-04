@@ -1,9 +1,9 @@
 use std::ops::Not;
 
 use crate::cpu::{Cpu, CpuFlags, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 
-pub fn opc3(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opc3(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let addr = mem.get_u16(cpu.pc.wrapping_add(1));
     cpu.pc = addr;
     Cycles(16)
@@ -11,7 +11,7 @@ pub fn opc3(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
 
 macro_rules! jp_cc {
     ( $name:ident, $bit:ident, $tf:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             if cpu.f.contains(CpuFlags::$bit) == $tf {
                 let addr = mem.get_u16(cpu.pc.wrapping_add(1));
                 cpu.pc = addr;
@@ -28,12 +28,12 @@ jp_cc!(opca, Z, true);
 jp_cc!(opd2, C, false);
 jp_cc!(opda, C, true);
 
-pub fn ope9(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+pub fn ope9(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
     cpu.pc = cpu.get_hl();
     Cycles(4)
 }
 
-pub fn op18(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn op18(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let n_u8 = mem.get_u8(cpu.pc.wrapping_add(1));
     let n_u16 = n_u8 as u16;
     let n_i8 = n_u8 as i8;
@@ -48,7 +48,7 @@ pub fn op18(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
 
 macro_rules! jp_cc_n {
     ( $name:ident, $bit:ident, $tf:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let cycles = if cpu.f.contains(CpuFlags::$bit) == $tf {
                 let n_u8 = mem.get_u8(cpu.pc.wrapping_add(1));
                 let n_u16 = n_u8 as u16;
@@ -73,7 +73,7 @@ jp_cc_n!(op28, Z, true);
 jp_cc_n!(op30, C, false);
 jp_cc_n!(op38, C, true);
 
-pub fn opcd(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn opcd(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     cpu.sp -= 2;
     let next_inst = cpu.pc.wrapping_add(3);
     mem.set_u16(cpu.sp, next_inst);
@@ -84,7 +84,7 @@ pub fn opcd(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
 
 macro_rules! call_cc_n {
     ( $name:ident, $bit:ident, $tf:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             if cpu.f.contains(CpuFlags::$bit) == $tf {
                 cpu.sp -= 2;
                 let next_inst = cpu.pc.wrapping_add(3);
@@ -106,7 +106,7 @@ call_cc_n!(opdc, C, true);
 
 macro_rules! rst {
     ( $name:ident, $offset:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             cpu.sp -= 2;
             let next_inst = cpu.pc.wrapping_add(1);
             mem.set_u16(cpu.sp, next_inst);
@@ -125,7 +125,7 @@ rst!(opf7, 0x30);
 rst!(opff, 0x38);
 
 // ret
-pub fn opc9(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opc9(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let addr = mem.get_u16(cpu.sp);
     cpu.sp += 2;
     cpu.pc = addr;
@@ -134,7 +134,7 @@ pub fn opc9(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
 
 macro_rules! ret_cc {
     ( $name:ident, $bit:ident, $tf:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             if cpu.f.contains(CpuFlags::$bit) == $tf {
                 let addr = mem.get_u16(cpu.sp);
                 cpu.sp += 2;
@@ -153,7 +153,7 @@ ret_cc!(opd0, C, false);
 ret_cc!(opd8, C, true);
 
 // reti
-pub fn opd9(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+pub fn opd9(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
     let addr = mem.get_u16(cpu.sp);
     cpu.sp += 2;
     cpu.pc = addr;

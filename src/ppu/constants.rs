@@ -13,5 +13,5 @@ pub const MODE_30_DOTS: u32 = 376;
 pub const MODE_3_DOTS: u32 = 220;
 pub const MODE_0_DOTS: u32 = MODE_30_DOTS - MODE_3_DOTS;
 
-pub const BYTES_PER_OAM: u16 = 4;
+pub const BYTES_PER_OAM: usize = 4;
 pub const MAX_OBJECTS_PER_LINE: usize = 10;

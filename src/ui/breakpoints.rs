@@ -32,16 +32,18 @@ impl<'a> Breakpoints<'a> {
                     debugger.command(Command::InsertBreakpoint(addr));
                 }
             });
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for bp in debugger.get_breakpoints().iter() {
-                    ui.horizontal(|ui| {
-                        if ui.button(monospace("➖")).clicked() {
-                            debugger.command(Command::RemoveBreakpoint(*bp));
-                        }
-                        ui.label(monospace(format!("0x{:04x}", bp)));
-                    });
-                }
-            });
+            egui::ScrollArea::vertical()
+                .id_source("breakpoints")
+                .show(ui, |ui| {
+                    for bp in debugger.get_breakpoints().iter() {
+                        ui.horizontal(|ui| {
+                            if ui.button(monospace("➖")).clicked() {
+                                debugger.command(Command::RemoveBreakpoint(*bp));
+                            }
+                            ui.label(monospace(format!("0x{:04x}", bp)));
+                        });
+                    }
+                });
         }
     }
 }

@@ -26,7 +26,14 @@ impl<'a> SerialConsole<'a> {
             std::mem::swap(self.console, &mut new);
         }
         ui.vertical(|ui| {
-            ui.label(title(ui, "serial console"));
+            ui.horizontal(|ui| {
+                ui.label(title(ui, "serial monitor"));
+                ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
+                    if ui.button(monospace("🗋")).clicked() {
+                        self.console.clear()
+                    }
+                });
+            });
 
             let te = TextEdit::multiline(self.console)
                 .code_editor()

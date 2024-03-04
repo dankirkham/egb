@@ -1,5 +1,3 @@
-use image::Rgb;
-
 use crate::cpu::Cpu;
 use crate::debugger::Debugger;
 use crate::memory::Memory;
@@ -8,16 +6,6 @@ use crate::serial::Serial;
 use crate::timer::Timer;
 
 pub const CLOCK_SPEED_HZ: u64 = 4_194_304 / 4;
-
-pub fn color(val: u8) -> Rgb<u8> {
-    match val {
-        0x03 => Rgb([15, 56, 15]),
-        0x02 => Rgb([48, 98, 48]),
-        0x01 => Rgb([139, 172, 15]),
-        0x00 => Rgb([155, 188, 15]),
-        _ => panic!("invalid color"),
-    }
-}
 
 pub struct Gameboy {
     pub cpu: Cpu,
@@ -53,15 +41,8 @@ impl Gameboy {
             }
         }
 
-        self.ppu.tick(&mut self.mem);
         self.timer.tick(&mut self.mem);
         self.ppu.tick(&mut self.mem);
-        self.timer.tick(&mut self.mem);
-        self.ppu.tick(&mut self.mem);
-        self.timer.tick(&mut self.mem);
-        self.ppu.tick(&mut self.mem);
-        self.timer.tick(&mut self.mem);
-
         let out = self.serial.tick(&mut self.mem);
         self.cpu.tick(&mut self.mem);
         out

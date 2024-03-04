@@ -9,78 +9,80 @@ use crate::memory_map::MemoryMap;
 
 use self::boot_rom::BOOT_ROM;
 
-macro_rules! memory_port {
-    ($name:ident) => {
-        pub trait $name {
-            fn set_u8(&mut self, address: impl Into<u16>, value: u8);
-            fn get_u8(&self, address: impl Into<u16>) -> u8;
+pub type UpperRam = [u8; 0x0200];
+pub type VRam = [u8; 0x2000];
 
-            fn set_u16(&mut self, address: impl Into<u16>, value: u16) {
-                let address = address.into();
-                self.set_u8(address, value as u8);
-                self.set_u8(address.wrapping_add(1), (value >> 8) as u8);
-            }
+pub trait ProgramMemory {
+    fn set_u8(&mut self, address: impl Into<u16>, value: u8);
+    fn get_u8(&self, address: impl Into<u16>) -> u8;
 
-            fn get_u16(&self, address: impl Into<u16>) -> u16 {
-                let address = address.into();
-                let l = self.get_u8(address);
-                let h = self.get_u8(address.wrapping_add(1));
-                ((h as u16) << 8) | (l as u16)
-            }
+    fn set_u16(&mut self, address: impl Into<u16>, value: u16) {
+        let address = address.into();
+        self.set_u8(address, value as u8);
+        self.set_u8(address.wrapping_add(1), (value >> 8) as u8);
+    }
 
-            fn get_reg<T: Flags<Bits = u8>>(&self, address: impl Into<u16>) -> T {
-                T::from_bits(self.get_u8(address)).unwrap()
-            }
-
-            fn set_reg<T: Flags<Bits = u8>>(&mut self, address: impl Into<u16>, val: T) {
-                self.set_u8(address, val.bits());
-            }
-
-            fn set_reg_flag<T: Flags<Bits = u8>>(&mut self, address: impl Into<u16>, val: T) {
-                let address = address.into();
-                let mut reg = self.get_reg::<T>(address);
-                reg.set(val, true);
-                self.set_reg(address, reg);
-            }
-
-            fn clear_reg_flag<T: Flags<Bits = u8>>(&mut self, address: impl Into<u16>, val: T) {
-                let address = address.into();
-                let mut reg = self.get_reg::<T>(address);
-                reg.set(val, false);
-                self.set_reg(address, reg);
-            }
-
-            /// Increments u8 in memory. Returns true if a carry occurs.
-            fn inc_u8(&mut self, address: impl Into<u16>) -> bool {
-                let address = address.into();
-                let val = self.get_u8(address);
-
-                match val.checked_add(1) {
-                    Some(new_val) => {
-                        self.set_u8(address, new_val);
-                        false
-                    }
-                    None => {
-                        self.set_u8(address, 0);
-                        true
-                    }
-                }
-            }
-        }
-    };
+    fn get_u16(&self, address: impl Into<u16>) -> u16 {
+        let address = address.into();
+        let l = self.get_u8(address);
+        let h = self.get_u8(address.wrapping_add(1));
+        ((h as u16) << 8) | (l as u16)
+    }
 }
-memory_port!(CpuMemory);
-memory_port!(PpuMemory);
-memory_port!(PrivilegedMemory);
 
 pub struct Memory {
     pub mbc: Mbc1,
     pub buttons: Buttons,
 }
 
+impl Memory {
+    pub fn set_u8(&mut self, address: impl Into<u16>, value: u8) {
+        let address: u16 = address.into();
+        debug_assert!(address > 0xfe00);
+        let ur = self.mbc.get_upper_ram_mut();
+        ur[address as usize - 0xfe00] = value;
+    }
+
+    pub fn get_u8(&self, address: impl Into<u16>) -> u8 {
+        let address: u16 = address.into();
+        debug_assert!(address > 0xfe00);
+        let ur = self.mbc.get_upper_ram();
+        ur[address as usize - 0xfe00]
+    }
+
+    pub fn set_u16(&mut self, address: impl Into<u16>, value: u16) {
+        let address = address.into();
+        self.set_u8(address, value as u8);
+        self.set_u8(address.wrapping_add(1), (value >> 8) as u8);
+    }
+
+    pub fn get_u16(&self, address: impl Into<u16>) -> u16 {
+        let address = address.into();
+        let l = self.get_u8(address);
+        let h = self.get_u8(address.wrapping_add(1));
+        ((h as u16) << 8) | (l as u16)
+    }
+
+    pub fn get_reg<T: Flags<Bits = u8>>(&self, address: impl Into<u16>) -> T {
+        T::from_bits(self.get_u8(address)).unwrap()
+    }
+
+    pub fn set_reg<T: Flags<Bits = u8>>(&mut self, address: impl Into<u16>, val: T) {
+        self.set_u8(address, val.bits());
+    }
+
+    pub fn get_vram(&self) -> &VRam {
+        self.mbc.get_vram()
+    }
+
+    pub fn get_upper_ram(&self) -> &UpperRam {
+        self.mbc.get_upper_ram()
+    }
+}
+
 impl From<&Memory> for BytesMut {
     fn from(val: &Memory) -> Self {
-        val.mbc.dump()
+        (&val.mbc).into()
     }
 }
 
@@ -95,7 +97,7 @@ impl From<Vec<u8>> for Memory {
     }
 }
 
-impl CpuMemory for Memory {
+impl ProgramMemory for Memory {
     fn set_u8(&mut self, address: impl Into<u16>, value: u8) {
         let address = address.into();
         match address {
@@ -134,30 +136,6 @@ impl CpuMemory for Memory {
             | 0xff56..=0xff67
             | 0xff6c..=0xff6f
             | 0xff71..=0xff7f => 0xff,
-            _ => self.mbc.get_u8(address),
-        }
-    }
-}
-
-impl PpuMemory for Memory {
-    fn set_u8(&mut self, address: impl Into<u16>, value: u8) {
-        self.mbc.set_u8(address, value);
-    }
-
-    fn get_u8(&self, address: impl Into<u16>) -> u8 {
-        self.mbc.get_u8(address)
-    }
-}
-
-impl PrivilegedMemory for Memory {
-    fn set_u8(&mut self, address: impl Into<u16>, value: u8) {
-        self.mbc.set_u8(address, value);
-    }
-
-    fn get_u8(&self, address: impl Into<u16>) -> u8 {
-        let address = address.into();
-        match address {
-            0xff00 => self.buttons.read(),
             _ => self.mbc.get_u8(address),
         }
     }

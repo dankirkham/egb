@@ -3,7 +3,7 @@ pub mod instr;
 use std::fmt::Display;
 
 use crate::cpu::instr::execute_instr;
-use crate::memory::CpuMemory;
+use crate::memory::{Memory, ProgramMemory};
 use crate::memory_map::MemoryMap;
 use crate::registers::{CpuFlags, Interrupt};
 
@@ -139,7 +139,7 @@ impl Cpu {
 
     fn handle_interrupt(
         &mut self,
-        mem: &mut impl CpuMemory,
+        mem: &mut Memory,
         reg: &Interrupt,
         bit: Interrupt,
         vector: MemoryMap,
@@ -148,11 +148,14 @@ impl Cpu {
             self.state = State::Running;
             if self.ie {
                 // Reset request flag
-                mem.clear_reg_flag(MemoryMap::IF, bit);
+                let mut reg = mem.get_reg::<Interrupt>(MemoryMap::IF);
+                reg.set(bit, false);
+                mem.set_reg(MemoryMap::IF, reg);
+
                 self.ie = false;
 
                 self.sp -= 2;
-                mem.set_u16(self.sp, self.pc);
+                ProgramMemory::set_u16(mem, self.sp, self.pc);
 
                 self.pc = vector.into();
 
@@ -165,7 +168,7 @@ impl Cpu {
 
     // Handle interrupts
     // http://gbdev.gg8.se/wiki/articles/Interrupts
-    fn handle_interrupts(&mut self, mem: &mut impl CpuMemory) -> bool {
+    fn handle_interrupts(&mut self, mem: &mut Memory) -> bool {
         let enabled = Interrupt::from_bits(mem.get_u8(MemoryMap::IE)).unwrap();
         let requested = Interrupt::from_bits(mem.get_u8(MemoryMap::IF)).unwrap();
         let enabled_and_requested = enabled.intersection(requested);
@@ -210,7 +213,7 @@ impl Cpu {
         )
     }
 
-    pub fn tick(&mut self, mem: &mut impl CpuMemory) {
+    pub fn tick(&mut self, mem: &mut Memory) {
         if self.wait > 0 {
             self.wait -= 1;
             return;

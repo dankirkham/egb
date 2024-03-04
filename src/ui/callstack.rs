@@ -17,6 +17,7 @@ impl<'a> Callstack<'a> {
         ui.label(title(ui, "callstack"));
         if let Some(debugger) = self.debugger.as_mut() {
             egui::ScrollArea::vertical()
+                .id_source("callstack")
                 // .stick_to_bottom(true)
                 // .max_height(50.)
                 // .auto_shrink(true)

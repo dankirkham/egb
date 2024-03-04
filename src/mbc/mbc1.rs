@@ -1,16 +1,17 @@
 use bytes::BytesMut;
 
 use crate::mbc::Mbc;
+use crate::memory::{UpperRam, VRam};
 use crate::memory_map::MemoryMap;
 
 pub struct Mbc1 {
     fixed_rom: [u8; 0x4000],
     switchable_rom: Vec<[u8; 0x4000]>,
-    vram: [u8; 0x2000],
+    vram: VRam,
     external_ram: Vec<[u8; 0x2000]>,
     wram1: [u8; 0x1000],
     wram2: [u8; 0x1000],
-    upper_ram: [u8; 0x0200],
+    upper_ram: UpperRam,
     advanced_banking_mode: bool,
     rom_size: usize,
     ram_enable: bool,
@@ -150,7 +151,21 @@ impl Mbc for Mbc1 {
         }
     }
 
-    fn dump(&self) -> bytes::BytesMut {
+    fn get_vram(&self) -> &VRam {
+        &self.vram
+    }
+
+    fn get_upper_ram(&self) -> &UpperRam {
+        &self.upper_ram
+    }
+
+    fn get_upper_ram_mut(&mut self) -> &mut UpperRam {
+        &mut self.upper_ram
+    }
+}
+
+impl Into<BytesMut> for &Mbc1 {
+    fn into(self) -> BytesMut {
         let rom = if self.advanced_banking_mode {
             let bank = ((self.secondary_banking & 0x3) << 4) | (self.primary_banking & 0xf);
             &self.switchable_rom[bank - 1]

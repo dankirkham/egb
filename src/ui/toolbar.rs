@@ -12,7 +12,11 @@ pub struct Toolbar<'a> {
 }
 
 impl<'a> Toolbar<'a> {
-    pub fn new(gameboy: &'a mut Gameboy, loader: &'a mut Loader, developer_mode: &'a mut bool) -> Self {
+    pub fn new(
+        gameboy: &'a mut Gameboy,
+        loader: &'a mut Loader,
+        developer_mode: &'a mut bool,
+    ) -> Self {
         Self {
             gameboy,
             loader,
@@ -31,13 +35,19 @@ impl<'a> Toolbar<'a> {
                 }
                 ui.separator();
                 ui.label(monospace("🖴 games"));
-                if ui.radio_value(&mut self.loader.rom, Rom::Game2048, "2048").clicked() {
+                if ui
+                    .radio_value(&mut self.loader.rom, Rom::Game2048, "2048")
+                    .clicked()
+                {
                     let _ = self.loader.reset_gameboy(self.gameboy);
                     ui.close_menu();
                 }
                 ui.separator();
                 ui.label(monospace("🖴 tests"));
-                if ui.radio_value(&mut self.loader.rom, Rom::TestCpuInstr, "cpu_instr").clicked() {
+                if ui
+                    .radio_value(&mut self.loader.rom, Rom::TestCpuInstr, "cpu_instr")
+                    .clicked()
+                {
                     let _ = self.loader.reset_gameboy(self.gameboy);
                     ui.close_menu();
                 }

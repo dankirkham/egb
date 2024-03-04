@@ -1,5 +1,5 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 use crate::registers::CpuFlags;
 
 fn rlca_flags(flags: &mut CpuFlags, value: u8) -> u8 {
@@ -20,7 +20,7 @@ fn rlc_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! rlc {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), rlc_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -28,7 +28,7 @@ macro_rules! rlc {
         }
     };
     ( $name:ident, $dst:ident, $size:literal, $flags:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = $flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -66,7 +66,7 @@ fn rl_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! rl {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), rl_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -74,7 +74,7 @@ macro_rules! rl {
         }
     };
     ( $name:ident, $dst:ident, $size:literal, $cycles:literal, $flags:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = $flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -110,7 +110,7 @@ fn rrc_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! rrc {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), rrc_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -118,7 +118,7 @@ macro_rules! rrc {
         }
     };
     ( $name:ident, $dst:ident, $size:literal, $cycles: literal, $flags:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = $flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -156,7 +156,7 @@ fn rr_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! rr {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), rr_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -164,7 +164,7 @@ macro_rules! rr {
         }
     };
     ( $name:ident, $dst:ident, $size:literal, $cycles:literal, $flags:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = $flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -192,7 +192,7 @@ fn sla_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! sla {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), sla_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -200,7 +200,7 @@ macro_rules! sla {
         }
     };
     ( $name:ident, $dst:ident, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = sla_flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -227,7 +227,7 @@ fn sra_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! sra {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), sra_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -235,7 +235,7 @@ macro_rules! sra {
         }
     };
     ( $name:ident, $dst:ident, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = sra_flags(&mut cpu.f, value);
             cpu.pc += $size;
@@ -262,7 +262,7 @@ fn srl_flags(flags: &mut CpuFlags, value: u8) -> u8 {
 }
 macro_rules! srl {
     ( $name:ident, hl, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
             let value = mem.get_u8(cpu.get_hl());
             mem.set_u8(cpu.get_hl(), srl_flags(&mut cpu.f, value));
             cpu.pc += $size;
@@ -270,7 +270,7 @@ macro_rules! srl {
         }
     };
     ( $name:ident, $dst:ident, $size:literal ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let value = cpu.$dst;
             cpu.$dst = srl_flags(&mut cpu.f, value);
             cpu.pc += $size;

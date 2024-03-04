@@ -1,10 +1,10 @@
 use crate::cpu::{Cpu, Cycles};
-use crate::memory::CpuMemory;
+use crate::memory::ProgramMemory;
 use crate::registers::CpuFlags;
 
 macro_rules! op8_reg {
     ( $name:ident, $op:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = cpu.$src;
             cpu.a = $op(&mut cpu.f, l, r);
@@ -15,7 +15,7 @@ macro_rules! op8_reg {
 }
 macro_rules! op8_mem {
     ( $name:ident, $op:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = mem.get_u8(cpu.get_hl());
             cpu.a = $op(&mut cpu.f, l, r);
@@ -26,7 +26,7 @@ macro_rules! op8_mem {
 }
 macro_rules! op8_imm {
     ( $name:ident, $op:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = mem.get_u8(cpu.pc.wrapping_add(1));
             cpu.a = $op(&mut cpu.f, l, r);
@@ -183,7 +183,7 @@ op8_imm!(opee, xor8);
 
 macro_rules! cp8_reg {
     ( $name:ident, $src:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = cpu.$src;
             cp8(&mut cpu.f, l, r);
@@ -194,7 +194,7 @@ macro_rules! cp8_reg {
 }
 macro_rules! cp8_mem {
     ( $name:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = mem.get_u8(cpu.get_hl());
             cp8(&mut cpu.f, l, r);
@@ -205,7 +205,7 @@ macro_rules! cp8_mem {
 }
 macro_rules! cp8_imm {
     ( $name:ident ) => {
-        pub fn $name(cpu: &mut Cpu, mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, mem: &impl ProgramMemory) -> Cycles {
             let l = cpu.a;
             let r = mem.get_u8(cpu.pc.wrapping_add(1));
             cp8(&mut cpu.f, l, r);
@@ -242,7 +242,7 @@ fn inc_flags(flags: &mut CpuFlags, input: u8) -> u8 {
 }
 macro_rules! inc_reg {
     ( $name:ident, $dst:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst = inc_flags(&mut cpu.f, cpu.$dst);
             cpu.pc += 1;
             Cycles(4)
@@ -256,7 +256,7 @@ inc_reg!(op14, d);
 inc_reg!(op1c, e);
 inc_reg!(op24, h);
 inc_reg!(op2c, l);
-pub fn op34(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn op34(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let input = mem.get_u8(cpu.get_hl());
     mem.set_u8(cpu.get_hl(), inc_flags(&mut cpu.f, input));
     cpu.pc += 1;
@@ -273,7 +273,7 @@ fn dec_flags(flags: &mut CpuFlags, input: u8) -> u8 {
 }
 macro_rules! dec_reg {
     ( $name:ident, $dst:ident ) => {
-        pub fn $name(cpu: &mut Cpu, _mem: &impl CpuMemory) -> Cycles {
+        pub fn $name(cpu: &mut Cpu, _mem: &impl ProgramMemory) -> Cycles {
             cpu.$dst = dec_flags(&mut cpu.f, cpu.$dst);
             cpu.pc += 1;
             Cycles(4)
@@ -287,7 +287,7 @@ dec_reg!(op15, d);
 dec_reg!(op1d, e);
 dec_reg!(op25, h);
 dec_reg!(op2d, l);
-pub fn op35(cpu: &mut Cpu, mem: &mut impl CpuMemory) -> Cycles {
+pub fn op35(cpu: &mut Cpu, mem: &mut impl ProgramMemory) -> Cycles {
     let input = mem.get_u8(cpu.get_hl());
     mem.set_u8(cpu.get_hl(), dec_flags(&mut cpu.f, input));
     cpu.pc += 1;

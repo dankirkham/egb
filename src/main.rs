@@ -1,12 +1,12 @@
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<(), std::io::Error> {
-    use std::fs::File;
     use clap::Parser;
     use egb::app::App;
     use egb::args::Args;
     use egb::loader::Loader;
     use egb::rom::Rom;
     use egb::symbols::Symbols;
+    use std::fs::File;
 
     fn load_symbols(path: Option<String>) -> Result<Option<Symbols>, std::io::Error> {
         if let Some(ref path) = path {
