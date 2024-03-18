@@ -27,6 +27,7 @@ pub struct App<'a> {
     developer_mode: bool,
     governor: Governor,
     last_toast: Instant,
+    show_about: bool,
 }
 
 impl<'a> App<'a> {
@@ -45,6 +46,7 @@ impl<'a> App<'a> {
             developer_mode: false,
             governor: Governor::default(),
             last_toast: Instant::now(),
+            show_about: true,
         }
     }
 }
@@ -55,11 +57,14 @@ impl eframe::App for App<'_> {
 
         self.governor.tick(&mut self.gameboy, &mut self.console);
 
+        About::new(&mut self.show_about).ctx(ctx);
+
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             Toolbar::new(
                 &mut self.gameboy,
                 &mut self.loader,
                 &mut self.developer_mode,
+                &mut self.show_about,
             )
             .ui(ui);
         });

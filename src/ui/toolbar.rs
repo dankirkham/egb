@@ -9,6 +9,7 @@ pub struct Toolbar<'a> {
     gameboy: &'a mut Gameboy,
     loader: &'a mut Loader,
     developer_mode: &'a mut bool,
+    show_about: &'a mut bool,
 }
 
 impl<'a> Toolbar<'a> {
@@ -16,11 +17,13 @@ impl<'a> Toolbar<'a> {
         gameboy: &'a mut Gameboy,
         loader: &'a mut Loader,
         developer_mode: &'a mut bool,
+        show_about: &'a mut bool,
     ) -> Self {
         Self {
             gameboy,
             loader,
             developer_mode,
+            show_about,
         }
     }
 
@@ -55,6 +58,10 @@ impl<'a> Toolbar<'a> {
                 if ui.button("↺ reset").clicked() {
                     let _ = self.loader.reset_gameboy(self.gameboy);
                     ui.close_menu();
+                }
+                ui.separator();
+                if ui.button("ℹ about").clicked() {
+                    *self.show_about = true;
                 }
             });
             if *self.developer_mode {

@@ -8,6 +8,7 @@ pub enum ViewerSelectSetting {
     #[default]
     Tiles,
     Background,
+    Objects,
 }
 
 #[derive(Default)]
@@ -15,6 +16,7 @@ pub struct ViewerSelectState<'a> {
     setting: ViewerSelectSetting,
     background: ViewerContext<'a>,
     tiles: ViewerContext<'a>,
+    objects: ViewerContext<'a>,
 }
 
 pub struct ViewerSelect<'a, 'b> {
@@ -39,6 +41,7 @@ impl<'a, 'b> ViewerSelect<'a, 'b> {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.state.setting, ViewerSelectSetting::Tiles, "tiles");
                 ui.selectable_value(&mut self.state.setting, ViewerSelectSetting::Background, "background");
+                ui.selectable_value(&mut self.state.setting, ViewerSelectSetting::Objects, "objects");
             });
 
             match self.state.setting {
@@ -54,6 +57,13 @@ impl<'a, 'b> ViewerSelect<'a, 'b> {
                         ui,
                         "background",
                         self.ppu.get_background(),
+                    );
+                },
+                ViewerSelectSetting::Objects => {
+                    Viewer::new(&mut self.state.objects).ui(
+                        ui,
+                        "objects",
+                        self.ppu.get_objects(),
                     );
                 },
             };

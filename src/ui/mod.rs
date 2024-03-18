@@ -1,3 +1,4 @@
+mod about;
 mod address_input;
 mod breakpoints;
 mod callstack;
@@ -14,6 +15,7 @@ mod speed_input;
 mod status;
 mod toolbar;
 
+pub use about::About;
 pub use address_input::AddressInput;
 pub use breakpoints::Breakpoints;
 pub use callstack::Callstack;

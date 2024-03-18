@@ -31,6 +31,10 @@ impl Buffers {
         Self::new(16 * constants::TILE_SIZE, 8 * 3 * constants::TILE_SIZE)
     }
 
+    pub fn objects() -> Self {
+        Self::new(10 * constants::TILE_SIZE, 4 * 2 * constants::TILE_SIZE)
+    }
+
     pub fn swap(&mut self) {
         std::mem::swap(&mut self.draw, &mut self.view);
     }
